@@ -1,0 +1,55 @@
+name: Feature Branch Test and Merge to Main
+
+on:
+  push:
+    branches:
+      - feature/*
+
+jobs:
+  test-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run test
+        run: python test_script.py
+
+      - name: Configure Git user
+        if: success()
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check for merge conflicts
+        if: success()
+        run: |
+          git fetch origin main
+          git merge --no-commit --no-ff origin/main || echo "Merge conflict detected. Aborting merge."
+        continue-on-error: true
+
+      - name: Fail if merge conflict detected
+        if: failure()
+        run: |
+          echo "Error: Merge conflict detected. Please resolve conflicts manually."
+          exit 1
+
+      - name: Merge to Main
+        if: success()
+        run: |
+          git checkout main
+          git merge ${{ github.ref_name }} -m "Merge feature branch into main after passing tests"
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
